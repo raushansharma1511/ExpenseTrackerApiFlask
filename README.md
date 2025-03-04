@@ -16,9 +16,6 @@ A comprehensive RESTful API for tracking personal expenses and managing financia
 - Database Schema
 - Background Tasks
 - Error Handling
-- Testing
-- Deployment
-- Future Improvements
 
 ## Introduction
 
@@ -45,36 +42,87 @@ The Flask Expense Tracker API is a robust financial management system designed t
 - **Data Validation**: Marshmallow schemas
 - **Migrations**: Flask-Migrate with Alembic
 
+
 ## Project Structure
 
 ```
-app/
-├── __init__.py               # Application factory
-├── config.py                 # Configuration settings
-├── extensions.py             # Flask extensions
-├── celery_app.py             # Celery configuration
-├── models/                   # Database models
-│   ├── base.py               # Base model with common fields
-│   ├── user.py               # User model
-│   ├── auth.py               # Authentication related models
-│   ├── category.py           # Category model
-│   └── transaction.py        # Transaction model
-├── resources/                # API resources/endpoints
-│   ├── auth.py               # Authentication endpoints
-│   ├── user.py               # User management endpoints
-│   ├── category.py           # Category management endpoints
-│   ├── transaction.py        # Transaction endpoints
-│   └── report.py             # Report generation endpoints
-├── schemas/                  # Marshmallow schemas for validation
-├── services/                 # Business logic services
-├── tasks/                    # Celery background tasks
-├── templates/                # Email templates
-├── utils/                    # Utility functions
-│   ├── constants.py          # Application constants
-│   ├── permissions.py        # Permission handling
-│   ├── validators.py         # Custom validators
-│   └── tokens.py             # Token handling utilities
-└── urls/                     # URL route definitions
+expense_tracker_api_flask/
+├── app/
+│   ├── __init__.py                # Flask application factory
+│   ├── config.py                  # Configuration settings
+│   ├── extensions.py              # Flask extensions (SQLAlchemy, JWT, etc.)
+│   ├── celery_app.py              # Celery configuration
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── base.py                # Base model with common fields
+│   │   ├── auth.py                # Authentication models (ActiveAccessToken)
+│   │   ├── user.py                # User model
+│   │   ├── category.py            # Category model
+│   │   └── transaction.py         # Transaction model
+│   ├── resources/
+│   │   ├── auth.py                # Authentication API endpoints
+│   │   ├── user.py                # User management endpoints
+│   │   ├── category.py            # Category management endpoints
+│   │   ├── transaction.py         # Transaction management endpoints
+│   │   └── report.py              # Report generation endpoints
+│   ├── schemas/
+│   │   ├── auth.py                # Authentication-related schemas
+│   │   ├── user.py                # User-related schemas
+│   │   ├── category.py            # Category-related schemas
+│   │   ├── transaction.py         # Transaction-related schemas
+│   │   └── report.py              # Report-related schemas
+│   ├── services/
+│   │   ├── auth.py                # Authentication business logic
+│   │   ├── user.py                # User management business logic
+│   │   ├── category.py            # Category management business logic
+│   │   ├── transaction.py         # Transaction management business logic
+│   │   └── report.py              # Report generation business logic
+│   ├── tasks/
+│   │   ├── auth.py                # Authentication-related async tasks
+│   │   └── user.py                # User-related async tasks
+│   ├── templates/
+│   │   └── emails/
+│   │       ├── base.html          # Base email template
+│   │       ├── auth/
+│   │       │   ├── verification.html     # Account verification email
+│   │       │   └── password_reset.html   # Password reset email
+│   │       └── user/
+│   │           ├── current_email_otp.html        # Current email OTP
+│   │           ├── new_email_otp.html            # New email OTP
+│   │           └── staff_email_change.html       # Staff email change
+│   ├── urls/
+│   │   ├── __init__.py            # Blueprint registration
+│   │   ├── auth.py                # Authentication routes
+│   │   ├── user.py                # User management routes
+│   │   ├── category.py            # Category management routes
+│   │   ├── transaction.py         # Transaction management routes
+│   │   └── report.py              # Report generation routes
+│   └── utils/
+│       ├── constants.py           # Application constants
+│       ├── email_helper.py        # Email helper functions
+│       ├── error_handlers.py      # Global error handlers
+│       ├── exceptions.py          # Custom exception classes
+│       ├── jwt_handlers.py        # JWT token handlers
+│       ├── logger.py              # Logging configuration
+│       ├── pagination.py          # Pagination utilities
+│       ├── permissions.py         # Permission decorators
+│       ├── responses.py           # Standardized API responses
+│       ├── tokens.py              # Token generation and verification
+│       └── validators.py          # Data validation utilities
+├── migrations/                    # Database migrations managed by Flask-Migrate
+│   ├── README
+│   ├── alembic.ini
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+├── logs/                          # Application logs directory
+│   └── app.log
+├── .env                           # Environment variables (not in version control)
+├── .gitignore                     # Git ignore file
+├── README.md                      # Project documentation
+├── celery_worker.py               # Celery worker entry point
+├── requirements.txt               # Project dependencies
+└── run.py                         # Application entry point
 ```
 
 ## Installation & Setup
@@ -89,8 +137,8 @@ app/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/expense-tracker-api-flask.git
-cd expense-tracker-api-flask
+git clone https://github.com/raushansharma1511/ExpenseTrackerApiFlask.git
+cd ExpenseTrackerApiFlask
 ```
 
 2. Create and activate virtual environment:
@@ -144,10 +192,15 @@ flask db upgrade
 
 6. Run the application:
 ```bash
-flask run
+python run.py
 ```
 
-7. Start the Celery worker in a separate terminal:
+7. Start redis server
+```bash
+redis-server
+```
+
+8. Start the Celery worker in a separate terminal:
 ```bash
 celery -A celery_worker.celery worker --loglevel=info
 ```
@@ -932,56 +985,5 @@ The API implements comprehensive error handling:
 - **Server Errors**: Graceful handling with appropriate logging
 - **Redis Errors**: Specialized handling for cache/queue failures
 
-## Testing
-
-To run the test suite:
-
-```bash
-pytest
-```
-
-The test suite includes:
-- Unit tests for service functions
-- Integration tests for API endpoints
-- Authentication and permission tests
-- Edge case handling tests
-
-## Deployment
-
-### Docker Deployment
-
-Dockerfile and docker-compose.yml files are included for containerized deployment.
-
-```bash
-# Build and start containers
-docker-compose up -d
-
-# Apply migrations
-docker-compose exec api flask db upgrade
-
-# Monitor logs
-docker-compose logs -f
-```
-
-### Production Considerations
-
-- Use Gunicorn or uWSGI as WSGI server
-- Set up Nginx as reverse proxy
-- Configure proper environment variables for production
-- Implement rate limiting
-- Enable HTTPS with proper certificates
-
-## Future Improvements
-
-- API rate limiting
-- OAuth 2.0 integration
-- More advanced reports and data visualization
-- Recurring transaction support
-- Budget planning and goals
-- Mobile application integration
-- Multi-currency support
-- Import/export functionality
-
----
 
 © 2025 Expense Tracker API. All rights reserved.
