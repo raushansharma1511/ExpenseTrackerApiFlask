@@ -1,0 +1,987 @@
+A comprehensive RESTful API for tracking personal expenses and managing financial transactions built with Flask.
+
+## Table of Contents
+
+- Introduction
+- Features
+- Technology Stack
+- Project Structure
+- Installation & Setup
+- API Documentation
+  - Authentication API
+  - User Management API
+  - Category Management API
+  - Transaction Management API
+  - Report API
+- Database Schema
+- Background Tasks
+- Error Handling
+- Testing
+- Deployment
+- Future Improvements
+
+## Introduction
+
+The Flask Expense Tracker API is a robust financial management system designed to help users track their income and expenses. It provides a complete backend solution with secure authentication, comprehensive transaction management, and advanced reporting features.
+
+## Features
+
+- **User Authentication**: Secure signup/login flow with JWT, email verification, and password reset
+- **User Management**: Profile management, email change with verification, account deletion
+- **Category Management**: Create, update, and manage expense/income categories
+- **Transaction Management**: Track financial transactions with detailed information
+- **Reporting**: Generate comprehensive financial reports with date filtering and category breakdown
+- **Role-Based Access Control**: Different permissions for regular users and administrators
+- **Email Notifications**: Beautiful HTML email templates for account actions
+- **Background Processing**: Asynchronous task handling with Celery and Redis
+
+## Technology Stack
+
+- **Framework**: Flask with Flask-RESTful
+- **Database**: PostgreSQL with SQLAlchemy ORM
+- **Authentication**: JWT (JSON Web Tokens) with Flask-JWT-Extended
+- **Task Queue**: Celery with Redis as message broker
+- **Email**: Flask-Mail with HTML templates
+- **Data Validation**: Marshmallow schemas
+- **Migrations**: Flask-Migrate with Alembic
+
+## Project Structure
+
+```
+app/
+├── __init__.py               # Application factory
+├── config.py                 # Configuration settings
+├── extensions.py             # Flask extensions
+├── celery_app.py             # Celery configuration
+├── models/                   # Database models
+│   ├── base.py               # Base model with common fields
+│   ├── user.py               # User model
+│   ├── auth.py               # Authentication related models
+│   ├── category.py           # Category model
+│   └── transaction.py        # Transaction model
+├── resources/                # API resources/endpoints
+│   ├── auth.py               # Authentication endpoints
+│   ├── user.py               # User management endpoints
+│   ├── category.py           # Category management endpoints
+│   ├── transaction.py        # Transaction endpoints
+│   └── report.py             # Report generation endpoints
+├── schemas/                  # Marshmallow schemas for validation
+├── services/                 # Business logic services
+├── tasks/                    # Celery background tasks
+├── templates/                # Email templates
+├── utils/                    # Utility functions
+│   ├── constants.py          # Application constants
+│   ├── permissions.py        # Permission handling
+│   ├── validators.py         # Custom validators
+│   └── tokens.py             # Token handling utilities
+└── urls/                     # URL route definitions
+```
+
+## Installation & Setup
+
+### Prerequisites
+
+- Python 3.9+
+- PostgreSQL
+- Redis Server
+
+### Installation Steps
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/expense-tracker-api-flask.git
+cd expense-tracker-api-flask
+```
+
+2. Create and activate virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Create a .env file with the following variables:
+```
+# Flask Configuration
+FLASK_APP=app
+FLASK_ENV=development
+SECRET_KEY=your-secret-key-here
+
+# Database Configuration
+DB_USER=yourdbuser
+DB_PASSWORD=yourdbpassword
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=expense_tracker
+
+# JWT Configuration
+JWT_SECRET_KEY=jwt-secret-key
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379/0
+
+# Email Configuration
+MAIL_SERVER=smtp.example.com
+MAIL_PORT=587
+MAIL_USE_TLS=True
+MAIL_USERNAME=your-email@example.com
+MAIL_PASSWORD=your-email-password
+MAIL_DEFAULT_SENDER=your-email@example.com
+
+# Celery Configuration
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+```
+
+5. Initialize the database:
+```bash
+flask db upgrade
+```
+
+6. Run the application:
+```bash
+flask run
+```
+
+7. Start the Celery worker in a separate terminal:
+```bash
+celery -A celery_worker.celery worker --loglevel=info
+```
+
+## API Documentation
+
+### Authentication API
+
+#### Register a new user
+
+**Endpoint:** `POST /api/auth/sign-up`
+
+**Request body:**
+```json
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "password": "Secure123!",
+  "name": "John Doe"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "message": "User registered successfully. Please check your email to verify your account.",
+  "user": {
+    "id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+    "username": "john_doe",
+    "email": "john@example.com",
+    "name": "John Doe",
+    "is_staff": false,
+    "is_verified": false,
+    "created_at": "2025-03-04T15:23:12.453Z"
+  }
+}
+```
+
+#### Verify user account
+
+**Endpoint:** `GET /api/auth/verify-user/{token}`
+
+**Response (200 OK):**
+```json
+{
+  "message": "Email verified successfully"
+}
+```
+
+#### Resend verification link
+
+**Endpoint:** `POST /api/auth/resend-verification-link`
+
+**Request body:**
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Verification link resent successfully. Please check your email."
+}
+```
+
+#### Login
+
+**Endpoint:** `POST /api/auth/login`
+
+**Request body:**
+```json
+{
+  "username_or_email": "john@example.com",
+  "password": "Secure123!"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Login successful",
+  "tokens": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+#### Refresh token
+
+**Endpoint:** `POST /api/auth/refresh-token`
+
+**Headers:**
+```
+Authorization: Bearer {refresh_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer"
+}
+```
+
+#### Logout
+
+**Endpoint:** `POST /api/auth/logout`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Successfully logged out"
+}
+```
+
+#### Request password reset
+
+**Endpoint:** `POST /api/auth/reset-password`
+
+**Request body:**
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Check your gmail inbox, you will receive a password reset link shortly."
+}
+```
+
+#### Confirm password reset
+
+**Endpoint:** `POST /api/auth/reset-password-confirm/{token}`
+
+**Request body:**
+```json
+{
+  "password": "NewSecure456!",
+  "confirm_password": "NewSecure456!"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Password has been reset successfully"
+}
+```
+
+### User Management API
+
+#### Get all users (staff only)
+
+**Endpoint:** `GET /api/users`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "items": [
+    {
+      "id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+      "username": "john_doe",
+      "email": "john@example.com",
+      "name": "John Doe",
+      "is_staff": false,
+      "is_verified": true,
+      "created_at": "2025-03-04T15:23:12.453Z"
+    },
+    {
+      "id": "a8205200-3d9d-4055-86c8-239379f34826",
+      "username": "jane_smith",
+      "email": "jane@example.com",
+      "name": "Jane Smith",
+      "is_staff": false,
+      "is_verified": true,
+      "created_at": "2025-03-04T16:45:32.123Z"
+    }
+  ],
+  "pagination": {
+    "total_items": 2,
+    "total_pages": 1,
+    "current_page": 1,
+    "per_page": 10,
+    "has_next": false,
+    "has_prev": false
+  }
+}
+```
+
+#### Get user profile
+
+**Endpoint:** `GET /api/users/{user_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "username": "john_doe",
+  "email": "john@example.com",
+  "name": "John Doe",
+  "is_staff": false,
+  "is_verified": true,
+  "created_at": "2025-03-04T15:23:12.453Z"
+}
+```
+
+#### Update user profile
+
+**Endpoint:** `PATCH /api/users/{user_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "username": "johnny_doe",
+  "name": "Johnny Doe"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "username": "johnny_doe",
+  "email": "john@example.com",
+  "name": "Johnny Doe",
+  "is_staff": false,
+  "is_verified": true,
+  "created_at": "2025-03-04T15:23:12.453Z"
+}
+```
+
+#### Update password
+
+**Endpoint:** `POST /api/users/{user_id}/update-password`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "current_password": "Secure123!",
+  "new_password": "StrongerPassword456!",
+  "confirm_password": "StrongerPassword456!"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Password updated successfully"
+}
+```
+
+#### Request email change
+
+**Endpoint:** `POST /api/users/{user_id}/update-email`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "new_email": "newemail@example.com"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Enter the otps sent to your current and new email addresses"
+}
+```
+
+#### Confirm email change
+
+**Endpoint:** `POST /api/users/{user_id}/update-email/confirm`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "current_email_otp": "123456",
+  "new_email_otp": "654321"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Email address updated successfully"
+}
+```
+
+#### Delete user account
+
+**Endpoint:** `DELETE /api/users/{user_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body (for non-staff deleting own account):**
+```json
+{
+  "password": "StrongerPassword456!"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "User deleted successfully"
+}
+```
+
+### Category Management API
+
+#### Get categories
+
+**Endpoint:** `GET /api/categories`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "items": [
+    {
+      "id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
+      "name": "Groceries",
+      "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+      "is_predefined": false,
+      "created_at": "2025-03-05T09:23:17.453Z"
+    },
+    {
+      "id": "b4c3d2e1-f5e6-d7c8-b9a0-1d2e3f4a5b6c",
+      "name": "Salary",
+      "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+      "is_predefined": false,
+      "created_at": "2025-03-05T09:45:32.123Z"
+    }
+  ],
+  "pagination": {
+    "total_items": 2,
+    "total_pages": 1,
+    "current_page": 1,
+    "per_page": 10,
+    "has_next": false,
+    "has_prev": false
+  }
+}
+```
+
+#### Create category
+
+**Endpoint:** `POST /api/categories`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "name": "Entertainment",
+  "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "d6e7f8g9-h0i1-j2k3-l4m5-n6o7p8q9r0s1",
+  "name": "Entertainment",
+  "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "is_predefined": false,
+  "created_at": "2025-03-05T14:27:45.782Z"
+}
+```
+
+#### Get category details
+
+**Endpoint:** `GET /api/categories/{category_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
+  "name": "Groceries",
+  "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "is_predefined": false,
+  "created_at": "2025-03-05T09:23:17.453Z"
+}
+```
+
+#### Update category
+
+**Endpoint:** `PATCH /api/categories/{category_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "name": "Food & Groceries"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
+  "name": "Food & Groceries",
+  "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "is_predefined": false,
+  "created_at": "2025-03-05T09:23:17.453Z"
+}
+```
+
+#### Delete category
+
+**Endpoint:** `DELETE /api/categories/{category_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Category deleted successfully"
+}
+```
+
+### Transaction Management API
+
+#### Get transactions
+
+**Endpoint:** `GET /api/transactions`
+
+**Query Parameters:**
+- `type`: "credit" or "debit" (optional)
+- `from_date`: ISO format date (optional)
+- `to_date`: ISO format date (optional)
+- `category_id`: UUID of category (optional)
+- `user_id`: UUID of user (optional, staff only)
+- `page`: Page number (default: 1)
+- `per_page`: Items per page (default: 10)
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "items": [
+    {
+      "id": "f1e2d3c4-b5a6-9876-5432-1fedcba09876",
+      "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+      "type": "debit",
+      "category_id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
+      "amount": 45.67,
+      "date_time": "2025-03-05T13:45:32.123Z",
+      "description": "Weekly grocery shopping",
+      "created_at": "2025-03-05T13:47:22.453Z"
+    },
+    {
+      "id": "a9b8c7d6-e5f4-3210-9876-5432fedc1a0b",
+      "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+      "type": "credit",
+      "category_id": "b4c3d2e1-f5e6-d7c8-b9a0-1d2e3f4a5b6c",
+      "amount": 3000.00,
+      "date_time": "2025-03-01T09:00:00.000Z",
+      "description": "Monthly salary",
+      "created_at": "2025-03-01T09:12:42.123Z"
+    }
+  ],
+  "pagination": {
+    "total_items": 2,
+    "total_pages": 1,
+    "current_page": 1,
+    "per_page": 10,
+    "has_next": false,
+    "has_prev": false,
+    "links": {
+      "first": "http://localhost:5000/api/transactions?page=1&per_page=10",
+      "last": "http://localhost:5000/api/transactions?page=1&per_page=10"
+    }
+  }
+}
+```
+
+#### Create transaction
+
+**Endpoint:** `POST /api/transactions`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "type": "debit",
+  "category_id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
+  "amount": 78.42,
+  "date_time": "2025-03-06T14:30:00.000Z",
+  "description": "Online shopping"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "e1d2c3b4-a5f6-9876-5432-1fedcba98765",
+  "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "type": "debit",
+  "category_id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
+  "amount": 78.42,
+  "date_time": "2025-03-06T14:30:00.000Z",
+  "description": "Online shopping",
+  "created_at": "2025-03-06T14:32:12.453Z"
+}
+```
+
+#### Get transaction details
+
+**Endpoint:** `GET /api/transactions/{transaction_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "f1e2d3c4-b5a6-9876-5432-1fedcba09876",
+  "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "type": "debit",
+  "category_id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
+  "amount": 45.67,
+  "date_time": "2025-03-05T13:45:32.123Z",
+  "description": "Weekly grocery shopping",
+  "created_at": "2025-03-05T13:47:22.453Z"
+}
+```
+
+#### Update transaction
+
+**Endpoint:** `PATCH /api/transactions/{transaction_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "amount": 52.35,
+  "description": "Weekly grocery shopping with extras"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "f1e2d3c4-b5a6-9876-5432-1fedcba09876",
+  "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "type": "debit",
+  "category_id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
+  "amount": 52.35,
+  "date_time": "2025-03-05T13:45:32.123Z",
+  "description": "Weekly grocery shopping with extras",
+  "created_at": "2025-03-05T13:47:22.453Z"
+}
+```
+
+#### Delete transaction
+
+**Endpoint:** `DELETE /api/transactions/{transaction_id}`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Transaction deleted successfully"
+}
+```
+
+### Report API
+
+#### Generate transaction report
+
+**Endpoint:** `GET /api/reports/transaction`
+
+**Query Parameters:**
+- `start_date`: Date in YYYY-MM-DD format (required)
+- `end_date`: Date in YYYY-MM-DD format (required)
+- `user_id`: UUID of user (optional, required for staff users viewing other users' reports)
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "total_income": 3000.00,
+  "total_expense": 176.44,
+  "category_wise_income_expense": [
+    {
+      "category_name": "Salary",
+      "total_credit": 3000.00,
+      "total_debit": 0.00,
+      "transaction_count": 1
+    },
+    {
+      "category_name": "Food & Groceries",
+      "total_credit": 0.00,
+      "total_debit": 98.02,
+      "transaction_count": 2
+    },
+    {
+      "category_name": "Entertainment",
+      "total_credit": 0.00,
+      "total_debit": 78.42,
+      "transaction_count": 1
+    }
+  ],
+  "transactions": {
+    "credit_transactions": [
+      {
+        "category_name": "Salary",
+        "amount": "3000.00",
+        "date_time": "2025-03-01T09:00"
+      }
+    ],
+    "debit_transactions": [
+      {
+        "category_name": "Entertainment",
+        "amount": "78.42",
+        "date_time": "2025-03-06T14:30"
+      },
+      {
+        "category_name": "Food & Groceries",
+        "amount": "52.35",
+        "date_time": "2025-03-05T13:45"
+      },
+      {
+        "category_name": "Food & Groceries",
+        "amount": "45.67",
+        "date_time": "2025-03-03T16:21"
+      }
+    ]
+  }
+}
+```
+
+## Database Schema
+
+### Users Table
+- `id`: UUID (primary key)
+- `username`: String (unique)
+- `email`: String (unique)
+- `password`: String (hashed)
+- `name`: String
+- `is_staff`: Boolean
+- `is_verified`: Boolean
+- `is_deleted`: Boolean
+- `created_at`: DateTime
+- `updated_at`: DateTime
+
+### Active Access Tokens Table
+- `id`: UUID (primary key)
+- `access_token`: String (unique)
+- `user_id`: UUID (foreign key to users)
+- `created_at`: DateTime
+
+### Categories Table
+- `id`: UUID (primary key)
+- `name`: String
+- `user_id`: UUID (foreign key to users)
+- `is_predefined`: Boolean
+- `is_deleted`: Boolean
+- `created_at`: DateTime
+- `updated_at`: DateTime
+
+### Transactions Table
+- `id`: UUID (primary key)
+- `user_id`: UUID (foreign key to users)
+- `type`: Enum ('credit', 'debit')
+- `category_id`: UUID (foreign key to categories)
+- `amount`: Numeric
+- `date_time`: DateTime
+- `description`: Text (nullable)
+- `is_deleted`: Boolean
+- `created_at`: DateTime
+- `updated_at`: DateTime
+
+## Background Tasks
+
+The application uses Celery with Redis for handling asynchronous tasks:
+
+1. **Email Sending**: All email communications are processed in the background
+   - Account verification emails
+   - Password reset links
+   - Email change verification OTPs
+
+2. **User Data Cleanup**: When a user is deleted, related data cleanup happens asynchronously
+   - Invalidating all user tokens
+   - Soft deleting user's categories
+   - Soft deleting user's transactions
+
+## Error Handling
+
+The API implements comprehensive error handling:
+
+- **Validation Errors**: Provides detailed field-level error messages
+- **Authorization Errors**: Proper 401/403 responses for unauthorized access
+- **Not Found Errors**: 404 responses for missing resources
+- **Server Errors**: Graceful handling with appropriate logging
+- **Redis Errors**: Specialized handling for cache/queue failures
+
+## Testing
+
+To run the test suite:
+
+```bash
+pytest
+```
+
+The test suite includes:
+- Unit tests for service functions
+- Integration tests for API endpoints
+- Authentication and permission tests
+- Edge case handling tests
+
+## Deployment
+
+### Docker Deployment
+
+Dockerfile and docker-compose.yml files are included for containerized deployment.
+
+```bash
+# Build and start containers
+docker-compose up -d
+
+# Apply migrations
+docker-compose exec api flask db upgrade
+
+# Monitor logs
+docker-compose logs -f
+```
+
+### Production Considerations
+
+- Use Gunicorn or uWSGI as WSGI server
+- Set up Nginx as reverse proxy
+- Configure proper environment variables for production
+- Implement rate limiting
+- Enable HTTPS with proper certificates
+
+## Future Improvements
+
+- API rate limiting
+- OAuth 2.0 integration
+- More advanced reports and data visualization
+- Recurring transaction support
+- Budget planning and goals
+- Mobile application integration
+- Multi-currency support
+- Import/export functionality
+
+---
+
+© 2025 Expense Tracker API. All rights reserved.
