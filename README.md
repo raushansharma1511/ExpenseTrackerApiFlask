@@ -6,7 +6,6 @@ A comprehensive RESTful API for tracking personal expenses and managing financia
 - Features
 - Technology Stack
 - Project Structure
-- Installation & Setup
 - API Documentation
   - Authentication API
   - User Management API
@@ -125,91 +124,15 @@ expense_tracker_api_flask/
 └── run.py                         # Application entry point
 ```
 
-## Installation & Setup
 
-### Prerequisites
-
-- Python 3.9+
-- PostgreSQL
-- Redis Server
-
-### Installation Steps
-
-1. Clone the repository:
-```bash
-git clone https://github.com/raushansharma1511/ExpenseTrackerApiFlask.git
-cd ExpenseTrackerApiFlask
-```
-
-2. Create and activate virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Create a .env file with the following variables:
-```
-# Flask Configuration
-FLASK_APP=app
-FLASK_ENV=development
-SECRET_KEY=your-secret-key-here
-
-# Database Configuration
-DB_USER=yourdbuser
-DB_PASSWORD=yourdbpassword
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=expense_tracker
-
-# JWT Configuration
-JWT_SECRET_KEY=jwt-secret-key
-
-# Redis Configuration
-REDIS_URL=redis://localhost:6379/0
-
-# Email Configuration
-MAIL_SERVER=smtp.example.com
-MAIL_PORT=587
-MAIL_USE_TLS=True
-MAIL_USERNAME=your-email@example.com
-MAIL_PASSWORD=your-email-password
-MAIL_DEFAULT_SENDER=your-email@example.com
-
-# Celery Configuration
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
-```
-
-5. Initialize the database:
-```bash
-flask db upgrade
-```
-
-6. Run the application:
-```bash
-python run.py
-```
-
-7. Start redis server
-```bash
-redis-server
-```
-
-8. Start the Celery worker in a separate terminal:
-```bash
-celery -A celery_worker.celery worker --loglevel=info
-```
-
-## API Documentation
+# API Documentation for Expense Tracker API
 
 ### Authentication API
 
 #### Register a new user
+Creates a new user account with the provided details. A verification email will be sent to complete registration.
+
+**Permissions:** Public access (no authentication required)
 
 **Endpoint:** `POST /api/auth/sign-up`
 
@@ -234,12 +157,17 @@ celery -A celery_worker.celery worker --loglevel=info
     "name": "John Doe",
     "is_staff": false,
     "is_verified": false,
-    "created_at": "2025-03-04T15:23:12.453Z"
+    "is_deleted": false,
+    "created_at": "2025-03-04T15:23:12.453Z",
+    "updated_at": "2025-03-04T15:23:12.453Z"
   }
 }
 ```
 
 #### Verify user account
+Verifies a user's email address using the token sent to their email during registration.
+
+**Permissions:** Public access (no authentication required)
 
 **Endpoint:** `GET /api/auth/verify-user/{token}`
 
@@ -251,6 +179,9 @@ celery -A celery_worker.celery worker --loglevel=info
 ```
 
 #### Resend verification link
+Resends the account verification email if the original one expired or was lost.
+
+**Permissions:** Public access (no authentication required)
 
 **Endpoint:** `POST /api/auth/resend-verification-link`
 
@@ -269,6 +200,9 @@ celery -A celery_worker.celery worker --loglevel=info
 ```
 
 #### Login
+Authenticates a user and returns JWT access and refresh tokens.
+
+**Permissions:** Public access (no authentication required)
 
 **Endpoint:** `POST /api/auth/login`
 
@@ -291,7 +225,12 @@ celery -A celery_worker.celery worker --loglevel=info
 }
 ```
 
+**Rate limiting:** Maximum 5 failed attempts before cooldown period
+
 #### Refresh token
+Generates a new access token using a valid refresh token when the access token expires.
+
+**Permissions:** Valid refresh token required
 
 **Endpoint:** `POST /api/auth/refresh-token`
 
@@ -308,6 +247,9 @@ Authorization: Bearer {refresh_token}
 ```
 
 #### Logout
+Invalidates the current access token, preventing its further use.
+
+**Permissions:** Authenticated user
 
 **Endpoint:** `POST /api/auth/logout`
 
@@ -324,6 +266,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Request password reset
+Initiates the password reset process by sending a reset link to the user's email.
+
+**Permissions:** Public access (no authentication required)
 
 **Endpoint:** `POST /api/auth/reset-password`
 
@@ -341,7 +286,12 @@ Authorization: Bearer {access_token}
 }
 ```
 
+**Rate limiting:** One request every 10 minutes per email address
+
 #### Confirm password reset
+Sets a new password using the token received in the password reset email.
+
+**Permissions:** Valid password reset token required
 
 **Endpoint:** `POST /api/auth/reset-password-confirm/{token}`
 
@@ -362,9 +312,16 @@ Authorization: Bearer {access_token}
 
 ### User Management API
 
-#### Get all users (staff only)
+#### Get all users
+Retrieves a paginated list of all users in the system.
+
+**Permissions:** Staff users only
 
 **Endpoint:** `GET /api/users`
+
+**Query Parameters:**
+- `page`: Page number (default: 1)
+- `per_page`: Items per page (default: 10)
 
 **Headers:**
 ```
@@ -405,7 +362,35 @@ Authorization: Bearer {access_token}
 }
 ```
 
-#### Get user profile
+#### Get current user profile
+Retrieves the profile details of the authenticated user.
+
+**Permissions:** Authenticated user
+
+**Endpoint:** `GET /api/users/me`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "fc083d64-474b-4093-ba0b-f92ac2850305",
+  "username": "john_doe",
+  "email": "john@example.com",
+  "name": "John Doe",
+  "is_staff": false,
+  "is_verified": true,
+  "created_at": "2025-03-04T15:23:12.453Z"
+}
+```
+
+#### Get user profile by ID
+Retrieves detailed information about a specific user.
+
+**Permissions:** Owner of the account or staff user(see the account of any user)
 
 **Endpoint:** `GET /api/users/{user_id}`
 
@@ -428,6 +413,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Update user profile
+Updates a user's profile information (username, name).
+
+**Permissions:** Owner of the account or staff user(but the only non deleted users).
 
 **Endpoint:** `PATCH /api/users/{user_id}`
 
@@ -458,6 +446,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Update password
+Changes a user's password after verifying the current password.
+
+**Permissions:** Owner of the account only
 
 **Endpoint:** `POST /api/users/{user_id}/update-password`
 
@@ -482,7 +473,10 @@ Authorization: Bearer {access_token}
 }
 ```
 
-#### Request email change
+#### Request email change (self-initiated)
+Initiates the email change process by sending verification codes to both current and new email addresses. This flow is used when users themselves request an email change.
+
+**Permissions:** Owner of the account only
 
 **Endpoint:** `POST /api/users/{user_id}/update-email`
 
@@ -505,7 +499,12 @@ Authorization: Bearer {access_token}
 }
 ```
 
-#### Confirm email change
+**Rate limiting:** One request every 5 minutes per user
+
+#### Confirm email change (self-initiated)
+Completes the self-initiated email change process by verifying OTPs from both current and new email addresses.
+
+**Permissions:** Owner of the account only
 
 **Endpoint:** `POST /api/users/{user_id}/update-email/confirm`
 
@@ -529,7 +528,52 @@ Authorization: Bearer {access_token}
 }
 ```
 
+#### Request email change (staff-initiated)
+Initiates an admin-driven email change process by sending a verification link to the new email address. This flow is used when staff members change another user's email.
+
+**Permissions:** Staff users only
+
+**Endpoint:** `POST /api/users/{user_id}/update-email`
+
+**Headers:**
+```
+Authorization: Bearer {access_token}
+```
+
+**Request body:**
+```json
+{
+  "new_email": "newemail@example.com"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Verification link sent to newemail@example.com. User must click the link to confirm email change."
+}
+```
+
+#### Verify email change (staff-initiated)
+Confirms a staff-initiated email change by verifying the token sent to the new email address.
+
+**Permissions:** Public access (no authentication required, but valid token needed)
+
+**Endpoint:** `GET /api/users/verify-email/{token}`
+
+**Response (200 OK):**
+```json
+{
+  "message": "Email address updated successfully"
+}
+```
+
 #### Delete user account
+Soft deletes a user account and associated data (categories, transactions).
+
+**Permissions:** 
+- Owner of the account (requires password verification)
+- Staff user(but the only non deleted users) (no password required)
 
 **Endpoint:** `DELETE /api/users/{user_id}`
 
@@ -555,8 +599,18 @@ Authorization: Bearer {access_token}
 ### Category Management API
 
 #### Get categories
+Retrieves a paginated list of categories.
+
+**Permissions:** 
+- Authenticated user sees their own categories and predefined categories(created by staff)
+- Staff users can see all categories with optional user_id filter
 
 **Endpoint:** `GET /api/categories`
+
+**Query Parameters:**
+- `user_id`: Filter by user (staff only)
+- `page`: Page number (default: 1)
+- `per_page`: Items per page (default: 10)
 
 **Headers:**
 ```
@@ -578,7 +632,7 @@ Authorization: Bearer {access_token}
       "id": "b4c3d2e1-f5e6-d7c8-b9a0-1d2e3f4a5b6c",
       "name": "Salary",
       "user_id": "fc083d64-474b-4093-ba0b-f92ac2850305",
-      "is_predefined": false,
+      "is_predefined": true,
       "created_at": "2025-03-05T09:45:32.123Z"
     }
   ],
@@ -594,6 +648,12 @@ Authorization: Bearer {access_token}
 ```
 
 #### Create category
+Creates a new category.
+Category created by staff user will be by defalut a predefined category and available for all users.
+
+**Permissions:** 
+- Authenticated user creates for themselves
+- Staff user can create for any user
 
 **Endpoint:** `POST /api/categories`
 
@@ -622,6 +682,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Get category details
+Retrieves detailed information about a specific category.
+
+**Permissions:** Owner of the category or staff user
 
 **Endpoint:** `GET /api/categories/{category_id}`
 
@@ -642,6 +705,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Update category
+Updates the name of an existing category.(user_id cannot be updated due to data conflicts.)
+
+**Permissions:** Owner of the category or staff user(only non deleted categories)
 
 **Endpoint:** `PATCH /api/categories/{category_id}`
 
@@ -669,6 +735,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Delete category
+Soft deletes a category.(But only if its associated resources like transactions does not exists.)
+
+**Permissions:** Owner of the category or staff user
 
 **Endpoint:** `DELETE /api/categories/{category_id}`
 
@@ -687,6 +756,11 @@ Authorization: Bearer {access_token}
 ### Transaction Management API
 
 #### Get transactions
+Retrieves a paginated list of financial transactions with optional filtering.
+
+**Permissions:** 
+- Authenticated user sees their own transactions
+- Staff user can see all transactions with optional user_id filter
 
 **Endpoint:** `GET /api/transactions`
 
@@ -745,6 +819,11 @@ Authorization: Bearer {access_token}
 ```
 
 #### Create transaction
+Records a new financial transaction (credit or debit) with category classification.
+
+**Permissions:** 
+- Authenticated user creates for themselves
+- Staff user can create for any user(but not for any staff user.)
 
 **Endpoint:** `POST /api/transactions`
 
@@ -761,7 +840,7 @@ Authorization: Bearer {access_token}
   "category_id": "c5d0b4f8-9e6d-4c3a-8b7f-1d2e3f4a5b6c",
   "amount": 78.42,
   "date_time": "2025-03-06T14:30:00.000Z",
-  "description": "Online shopping"
+  "description": "Online shopping" #optional
 }
 ```
 
@@ -780,6 +859,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Get transaction details
+Retrieves detailed information about a specific transaction.
+
+**Permissions:** Owner of the transaction or staff user
 
 **Endpoint:** `GET /api/transactions/{transaction_id}`
 
@@ -803,6 +885,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Update transaction
+Updates the details of an existing transaction.
+
+**Permissions:** Owner of the transaction or staff user(only the non deleted transactions.)
 
 **Endpoint:** `PATCH /api/transactions/{transaction_id}`
 
@@ -834,6 +919,9 @@ Authorization: Bearer {access_token}
 ```
 
 #### Delete transaction
+Soft deletes a transaction from the system.
+
+**Permissions:** Owner of the transaction or staff user.(only the non deleted transactions)
 
 **Endpoint:** `DELETE /api/transactions/{transaction_id}`
 
@@ -852,8 +940,13 @@ Authorization: Bearer {access_token}
 ### Report API
 
 #### Generate transaction report
+Creates a comprehensive financial report with summaries and transaction listings for a specified date range.
 
-**Endpoint:** `GET /api/reports/transaction`
+**Permissions:** 
+- Authenticated user can generate reports for their own data
+- Staff user can generate reports for any user with specified user_id
+
+**Endpoint:** `GET /api/transaction-report`
 
 **Query Parameters:**
 - `start_date`: Date in YYYY-MM-DD format (required)
