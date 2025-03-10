@@ -21,11 +21,18 @@ from app.utils.responses import validation_error_response
 from app.utils.pagination import paginate
 from app.utils.logger import logger
 
+from app.extensions import limiter
+
+
+def get_user_or_ip():
+
+    return 1
+
 
 class TransactionListResource(Resource):
     """Resource for listing and creating transactions"""
 
-    method_decorators = [authenticated_user()]
+    method_decorators = [authenticated_user]
 
     def get(self):
         """Get paginated list of transactions with filtering"""
@@ -88,7 +95,7 @@ class TransactionDetailResource(Resource):
 
     method_decorators = [
         object_permission(Transaction, id_param="transaction_id"),
-        authenticated_user(),
+        authenticated_user,
     ]
 
     def get(self, transaction_id):

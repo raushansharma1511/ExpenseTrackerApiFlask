@@ -44,7 +44,9 @@ class TransactionSchema(ma.SQLAlchemyAutoSchema):
         unknown = EXCLUDE
 
     type = EnumField(TransactionType, by_value=True)
-    amount = fields.Float(required=True, validate=Range(min=min_val, max=max_val))
+    amount = fields.Decimal(
+        required=True, validate=Range(min=min_val, max=max_val), as_string=True
+    )
 
     @validates("user_id")
     def validate_user_id(self, value):

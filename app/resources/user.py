@@ -39,7 +39,7 @@ from app.utils.tokens import TokenHandler
 class UserListResource(Resource):
     """Resource to list all users (staff only)"""
 
-    @authenticated_user()
+    @authenticated_user
     @staff_required()
     def get(self):
         """Get paginated list of all users"""
@@ -60,7 +60,7 @@ class UserDetailResource(Resource):
 
     method_decorators = [
         object_permission(User, id_param="user_id", check_fn=user_profile_permission),
-        authenticated_user(),
+        authenticated_user,
     ]
 
     def get(self, user_id):
@@ -129,7 +129,7 @@ class PasswordUpdateResource(Resource):
 
     method_decorators = [
         object_permission(User, id_param="user_id", check_fn=user_self_permission),
-        authenticated_user(),
+        authenticated_user,
     ]
 
     def post(self, user_id):
@@ -187,7 +187,7 @@ class UserEmailChangeResource(Resource):
         object_permission(
             User, id_param="user_id", check_fn=user_email_change_permission
         ),
-        authenticated_user(),
+        authenticated_user,
     ]
 
     def post(self, user_id):
@@ -237,7 +237,7 @@ class EmailChangeConfirmResource(Resource):
 
     method_decorators = [
         object_permission(User, id_param="user_id", check_fn=user_self_permission),
-        authenticated_user(),
+        authenticated_user,
     ]
 
     def post(self, user_id):

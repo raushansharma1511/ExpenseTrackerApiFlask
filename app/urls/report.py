@@ -7,5 +7,5 @@ report_api = Api(report_bp)
 
 # Register endpoints
 report_api.add_resource(
-    TransactionReportResource, "/transaction", endpoint="transaction-report"
+    TransactionReportResource, "/transaction-report", endpoint="transaction-report"
 )

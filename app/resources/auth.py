@@ -86,7 +86,7 @@ class LoginResource(Resource):
             logger.info(f"Received login request with data: {data}")
 
             data = login_schema.load(data)
-            user = authenticate_user(data["username_or_email"], data["password"])
+            user = authenticate_user(data["username"], data["password"])
             tokens = generate_tokens(user)
 
             logger.info(f"User logged in successfully: {user.username}")
@@ -99,7 +99,8 @@ class LoginResource(Resource):
 
 
 class LogoutResource(Resource):
-    @authenticated_user()
+
+    @authenticated_user
     def post(self):
         """Log out the current user by invalidating their token."""
         logger.info("Received logout request")
@@ -126,7 +127,7 @@ class RefreshAccessTokenResource(Resource):
         access_token = TokenHandler.generate_access_token(user, False)
 
         logger.info(f"Refreshed access token for user: {user.username}")
-        return {"access_token": access_token, "token_type": "Bearer"}, 200
+        return {"access_token": access_token}, 200
 
 
 class PasswordResetRequestResource(Resource):

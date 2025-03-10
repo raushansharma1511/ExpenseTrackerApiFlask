@@ -28,7 +28,8 @@ def create_user(user):
 def send_account_verification_link(user, endpoint="auth.verify-user"):
     """
     Generate UUID token, store in Redis, and send email.
-    Rate limited to prevent spam - only one link every 10 minutes per user.
+    Rate limited to prevent spam - only one link every ttl.
+    Any previous verification link for this user is invalidated.
     """
     # Check if a rate limit key exists for this user
     rate_limit_key = f"verify_rate_limit:{user.id}"
@@ -43,21 +44,39 @@ def send_account_verification_link(user, endpoint="auth.verify-user"):
             f"Please wait {minutes_remaining} minutes before requesting another verification link"
         )
 
-    # Generate verification token
+    # Key to track the active verification token for this user
+    user_active_token_key = f"user_active_verification_token:{user.id}"
+
+    # Invalidate any previous verification token for this user
+    previous_token = redis_client.get(user_active_token_key)
+    if previous_token:
+        old_token_key = f"verification_token:{previous_token}"
+        redis_client.delete(old_token_key)
+        logger.info(
+            f"Invalidated previous verification token: {old_token_key} for user {user.id}"
+        )
+
+    # Generate new verification token
     token = str(uuid.uuid4())
     redis_key = f"verification_token:{token}"
 
     verification_ttl = ACCCOUNT_VERIFICATION_LINK_VALIDITY
     rate_limit_ttl = ACCCOUNT_VERIFICATION_LINK_SEND_RATE_LIMIT
 
+    # Store new token
     redis_client.setex(
         redis_key, verification_ttl, str(user.id)
-    )  # Token expires in 10 minutes
+    )  # Token expires based on TTL
 
-    # Set rate limit for 10 minutes (600 seconds)
+    # Store this as the active token for this user
+    redis_client.setex(user_active_token_key, verification_ttl, token)
+
+    # Set rate limit
     redis_client.setex(rate_limit_key, rate_limit_ttl, "1")
 
-    logger.info(f"Stored token in Redis: {redis_key} -> {user.id}")
+    logger.info(
+        f"Stored token in Redis: {redis_key} -> {user.id}, invalidated previous token"
+    )
 
     verify_url = url_for(endpoint, token=token, _external=True)
 
@@ -82,11 +101,13 @@ def verify_user_by_token(token):
     if user.is_verified:
         logger.info(f"User already verified: {user.email}")
         redis_client.delete(redis_key)  # Clean up
+        redis_client.delete(f"user_active_verification_token:{str(user_id)}")
         return False
 
     user.is_verified = True
     db.session.commit()
     redis_client.delete(redis_key)  # Clean up after verification
+    redis_client.delete(f"user_active_verification_token:{str(user_id)}")
     logger.info(f"User verified: {user.email}")
     return True
 
@@ -167,7 +188,7 @@ def send_password_reset_link(email, endpoint="auth.reset-password-confirm"):
     rate_limit_key = f"password_reset_link_rate_limit:{user.id}"
     if redis_client.exists(rate_limit_key):
         time_remaining = redis_client.ttl(rate_limit_key)
-        minutes_remaining = int(time_remaining / 60)
+        minutes_remaining = int(time_remaining / 60) + 1
 
         logger.warning(f"Rate limit hit for password reset email to {email}")
         raise ValidationError(

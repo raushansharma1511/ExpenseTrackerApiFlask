@@ -9,56 +9,24 @@ from app.utils.validators import is_valid_uuid
 from app.extensions import db
 
 
-def authenticated_user():
-    """
-    Decorator to check if the user is authenticated and their token is in the database.
-    Attaches the user to Flask's g object as g.user.
-    """
+def authenticated_user(fn):
+    @wraps(fn)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        token = request.headers.get("Authorization").split(" ")[1]
+        token_entry = ActiveAccessToken.query.filter_by(access_token=token).first()
 
-    def decorator(fn):
-        @wraps(fn)
-        @jwt_required()
-        def wrapper(*args, **kwargs):
-            auth_header = request.headers.get("Authorization", "")
-            if not auth_header.startswith("Bearer "):
-                logger.warning("Invalid authorization header: Missing 'Bearer ' prefix")
-                return (
-                    {
-                        "error": "Invalid authorization header, must start with 'Bearer'."
-                    },
-                    401,
-                )
+        if not token_entry or not token_entry.user:
+            logger.error(
+                f"Authentication failed: Invalid token or no user for '{token}'"
+            )
+            return {"error": "Invalid authorization detail."}, 401
 
-            token = auth_header.split(" ")[1]
-            token_entry = ActiveAccessToken.query.filter_by(access_token=token).first()
-            if not token_entry:
-                logger.error(
-                    f"Authentication failed: Token '{token}' not found in ActiveAccessToken"
-                )
-                return (
-                    {"error": "Invalid authorization detail."},
-                    401,
-                )
+        g.user = token_entry.user
+        logger.info(f"User authenticated successfully: {g.user.id}")
+        return fn(*args, **kwargs)
 
-            user = token_entry.user
-            if not user:
-                logger.error(
-                    f"Authentication failed: No user associated with token '{token}'"
-                )
-                return (
-                    {
-                        "error": "Invalid authorization detail.",
-                    },
-                    401,
-                )
-
-            g.user = user
-            logger.info(f"User authenticated successfully: {user.id}")
-            return fn(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
+    return wrapper
 
 
 def object_permission(model_class, id_param="id", check_fn=None):

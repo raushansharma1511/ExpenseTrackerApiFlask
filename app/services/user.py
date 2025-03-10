@@ -63,17 +63,7 @@ def request_email_change(user, new_email):
 def confirm_email_change(user, current_email_otp, new_email_otp):
     """
     Confirm email change with separate OTPs for each email.
-
-    Args:
-        user: The user requesting the change
-        current_email_otp: OTP sent to the current email
-        new_email_otp: OTP sent to the new email
-
-    Returns:
-        bool: True if successful
-
-    Raises:
-        ValidationError: If verification fails
+    - verify the otps send on the both email.
     """
     try:
         # Get stored data from Redis
@@ -115,53 +105,69 @@ def confirm_email_change(user, current_email_otp, new_email_otp):
 
 def generate_staff_email_change_token(user, new_email):
     """
-    Generate a token for staff-initiated email change for a particular user and store in Redis.
+    Generate a token for staff-initiated email change, invalidate all previous tokens,
+    store the new token in Redis, and track it in a set.
     """
     # Generate a random token
     token = secrets.token_urlsafe(32)
-
-    # Store in Redis with 24 hour expiration
     redis_key = f"staff_email_change:{token}"
+    user_active_token_key = f"user_active_email_change:{user.id}"
 
+    # Rate limit check
     redis_ttl_key = f"staff_email_change_ttl:{user.id}"
-
     if redis_client.exists(redis_ttl_key):
         time_remaining = redis_client.ttl(redis_ttl_key)
-        minutes_remaining = int(time_remaining / 60)
+        minutes_remaining = int(time_remaining / 60) + 1
         raise ValidationError(
             f"Please wait {minutes_remaining} minutes before requesting another email change"
         )
 
-    redis_client.setex(redis_ttl_key, EMAIL_CHANGE_TOKEN_RESEND, "1")
+    # Invalidate all previous tokens
+    previous_token = redis_client.get(user_active_token_key)
+    if previous_token:
+        old_token_key = f"staff_email_change:{previous_token}"
+        redis_client.delete(old_token_key)
+        logger.info(
+            f"Invalidated previous email change token: {old_token_key} for user {user.id}"
+        )
+
+    # Store the new token with user ID and new email
     redis_client.setex(redis_key, EMAIL_CHANGE_TOKEN_VALIDITY, f"{user.id}:{new_email}")
 
+    # Add the new token to the set
+    redis_client.setex(user_active_token_key, EMAIL_CHANGE_TOKEN_VALIDITY, token)
+
+    # Set rate limit
+    redis_client.setex(redis_ttl_key, EMAIL_CHANGE_TOKEN_RESEND, "1")
+
     logger.info(
-        f"Staff-initiated email change token generated for user {user.id}: {user.email} -> {new_email}"
+        f"Staff-initiated email change token generated for user {user.id}: {user.email} -> {new_email}, "
+        f"previous token invalidated."
     )
     return token
 
 
 def verify_staff_email_change_token(token):
     """
-    Verify a staff-initiated email change token.
-    Args:
-        token: The verification token
-    Returns:
-        tuple: (user_id, new_email) if valid, (None, None) if invalid
+    Verify a staff-initiated email change token and clean up.
     """
+
     redis_key = f"staff_email_change:{token}"
     stored_data = redis_client.get(redis_key)
 
     if not stored_data:
+        logger.warning(f"Invalid or expired token: {token}")
         return None, None
 
-    # Delete the key to prevent reuse
-    redis_client.delete(redis_key)
-
     # Parse the stored data
-
     user_id, new_email = stored_data.split(":")
 
+    redis_client.delete(redis_key)  # Delete the used token
+    redis_client.delete(
+        f"user_active_email_change:{user_id}"
+    )  # Delete the active token reference.
+
+    logger.info(f"Verified token {token} for user {user_id}, token invalidated")
     return user_id, new_email
 
 

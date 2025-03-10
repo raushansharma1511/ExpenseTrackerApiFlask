@@ -6,6 +6,9 @@ from flask_marshmallow import Marshmallow
 from flask_mail import Mail
 import redis
 import os
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask import g
 
 
 db = SQLAlchemy()
@@ -20,3 +23,14 @@ redis_client = redis.StrictRedis(
     db=int(os.getenv("REDIS_DB", 0)),
     decode_responses=True,
 )
+
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["5 per day"],
+    storage_uri="redis://localhost:6379/0",
+)
+
+
+def init_limiter(app):
+    limiter.init_app(app)

@@ -27,7 +27,7 @@ from app.utils.logger import logger
 class CategoryListResource(Resource):
     """Resource for listing and creating categories"""
 
-    method_decorators = [authenticated_user()]
+    method_decorators = [authenticated_user]
 
     def get(self):
         """Get paginated list of categories"""
@@ -78,7 +78,7 @@ class CategoryDetailResource(Resource):
         object_permission(
             Category, id_param="category_id", check_fn=category_permission
         ),
-        authenticated_user(),
+        authenticated_user,
     ]
 
     def get(self, category_id):

@@ -100,7 +100,7 @@ expense_tracker_api_flask/
 │       ├── constants.py           # Application constants
 │       ├── email_helper.py        # Email helper functions
 │       ├── error_handlers.py      # Global error handlers
-│       ├── exceptions.py          # Custom exception classes
+│       ├── exception_handler.py   # Custom exception handler
 │       ├── jwt_handlers.py        # JWT token handlers
 │       ├── logger.py              # Logging configuration
 │       ├── pagination.py          # Pagination utilities
@@ -123,6 +123,9 @@ expense_tracker_api_flask/
 ├── requirements.txt               # Project dependencies
 └── run.py                         # Application entry point
 ```
+
+# Github Link:
+[GitHub Repository](https://github.com/raushansharma1511/ExpenseTrackerApiFlask/)
 
 
 # API Documentation for Expense Tracker API
@@ -225,8 +228,6 @@ Authenticates a user and returns JWT access and refresh tokens.
 }
 ```
 
-**Rate limiting:** Maximum 5 failed attempts before cooldown period
-
 #### Refresh token
 Generates a new access token using a valid refresh token when the access token expires.
 
@@ -285,8 +286,6 @@ Initiates the password reset process by sending a reset link to the user's email
   "message": "Check your gmail inbox, you will receive a password reset link shortly."
 }
 ```
-
-**Rate limiting:** One request every 10 minutes per email address
 
 #### Confirm password reset
 Sets a new password using the token received in the password reset email.
@@ -498,8 +497,6 @@ Authorization: Bearer {access_token}
   "message": "Enter the otps sent to your current and new email addresses"
 }
 ```
-
-**Rate limiting:** One request every 5 minutes per user
 
 #### Confirm email change (self-initiated)
 Completes the self-initiated email change process by verifying OTPs from both current and new email addresses.

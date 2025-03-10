@@ -11,4 +11,4 @@ def register_blueprints(app):
     app.register_blueprint(user_bp, url_prefix="/api/users")
     app.register_blueprint(category_bp, url_prefix="/api/categories")
     app.register_blueprint(transaction_bp, url_prefix="/api/transactions")
-    app.register_blueprint(report_bp, url_prefix="/api/reports")
+    app.register_blueprint(report_bp, url_prefix="/api")

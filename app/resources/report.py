@@ -11,7 +11,7 @@ from app.utils.logger import logger
 class TransactionReportResource(Resource):
     """Resource for generating transaction reports"""
 
-    @authenticated_user()
+    @authenticated_user
     def get(self):
         """Generate a transaction report with date range filtering"""
         try:

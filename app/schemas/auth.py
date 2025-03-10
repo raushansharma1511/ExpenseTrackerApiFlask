@@ -50,7 +50,7 @@ class ResendAccountVerificationLinkSchema(ma.Schema):
 
 
 class LoginSchema(ma.Schema):
-    username_or_email = fields.String(required=True, description="Username or Email")
+    username = fields.String(required=True, description="Username or email")
     password = fields.String(required=True)
 
 

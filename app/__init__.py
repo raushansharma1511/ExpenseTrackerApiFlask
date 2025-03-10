@@ -2,11 +2,11 @@ from flask import Flask
 from marshmallow.exceptions import ValidationError
 
 from app.config import Config  # Import configuration settings
-from app.extensions import db, migrate, bcrypt, jwt, mail, redis_client
+from app.extensions import db, migrate, bcrypt, jwt, mail, init_limiter, limiter
 from app.urls import register_blueprints
 from app.utils.jwt_handlers import register_jwt_error_handlers
 from app.celery_app import make_celery
-from app.utils.exceptions import handle_error
+from app.utils.exception_handler import handle_error
 
 
 def create_app():
@@ -30,7 +30,7 @@ def create_app():
     app.celery = make_celery(app)
     handle_error(app)
 
-    return app  # Return the Flask app instance
+    return app
 
 
 # importing all the models

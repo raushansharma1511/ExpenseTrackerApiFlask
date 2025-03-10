@@ -94,4 +94,6 @@ def normalize_category_name(name):
     # Capitalize only the first word, keep others as lowercase
     if words:
         normalized = words[0].capitalize() + " " + " ".join(words[1:])
+
+    normalized = normalized.strip()
     return normalized
